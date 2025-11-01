@@ -18,3 +18,41 @@ def arpabet_to_visual(arpabet_str: str):
     """
     tokens = arpabet_str.split()
     return [{"text": t} for t in tokens]
+
+# ✅ NEW: NON-BREAKING ADDITION
+def get_phonetics_syllables(word: str):
+    """
+    Returns syllable groupings + phonemes.
+    Safely falls back to plain word if unavailable.
+    """
+    phones = pronouncing.phones_for_word(word.lower())
+
+    # fallback
+    if not phones:
+        return {
+            "word": word,
+            "syllables": [word],
+            "phonemes": word
+        }
+
+    arpabet = phones[0]
+    phoneme_list = arpabet.split()
+
+    # syllable segmentation based on stress markers
+    syllables = []
+    current = []
+
+    for p in phoneme_list:
+        current.append(p)
+        if any(x.isdigit() for x in p):  # stress → syllable boundary
+            syllables.append(" ".join(current))
+            current = []
+
+    if current:
+        syllables.append(" ".join(current))
+
+    return {
+        "word": word,
+        "syllables": syllables,
+        "phonemes": phoneme_list
+    }

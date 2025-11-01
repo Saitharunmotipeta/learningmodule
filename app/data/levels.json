@@ -1,0 +1,23 @@
+{
+  "level_1": [
+    "cat",
+    "dog",
+    "sun",
+    "cup",
+    "ball"
+  ],
+  "level_2": [
+    "apple",
+    "chair",
+    "banana",
+    "tiger",
+    "music"
+  ],
+  "level_3": [
+    "elephant",
+    "hospital",
+    "vacation",
+    "computer",
+    "mystery"
+  ]
+}
