@@ -1,19 +1,19 @@
 {
-  "level_1": [
+  "easy": [
     "cat",
     "dog",
     "sun",
     "cup",
     "ball"
   ],
-  "level_2": [
+  "medium": [
     "apple",
     "chair",
     "banana",
     "tiger",
     "music"
   ],
-  "level_3": [
+  "hard": [
     "elephant",
     "hospital",
     "vacation",

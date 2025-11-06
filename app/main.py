@@ -7,6 +7,9 @@ from app.database.connection import Base, engine
 from app.models.user import User
 from app.models.word import Word
 from app.models.progress import UserProgress
+from app.models.level import Level
+from app.models.level_word import LevelWord
+
 
 load_dotenv()
 Base.metadata.create_all(bind=engine)
