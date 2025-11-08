@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from app.routes.learning import router as learning_router
 from app.routes.users import router as users_router
+from app.routes.progress import router as progress_router
 from app.database.connection import Base, engine
 from app.models.user import User
 from app.models.word import Word
@@ -25,5 +26,6 @@ app.add_middleware(
 )
 
 # Register routers
-app.include_router(learning_router, prefix="/api/learning", tags=["learning"])
 app.include_router(users_router, prefix="/api/users", tags=["users"])
+app.include_router(learning_router, prefix="/api/learning", tags=["learning"])
+app.include_router(progress_router, prefix="/api/learning", tags=["progress"])
