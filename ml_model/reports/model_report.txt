@@ -1,0 +1,8 @@
+
+=== MODEL COMPARISON REPORT ===
+
+Logistic Regression Accuracy: 0.9712
+Random Forest Accuracy: 1.0000
+SVM Accuracy: 0.9808
+Decision Tree Accuracy: 1.0000
+K-Means ARI Score: 0.0383
