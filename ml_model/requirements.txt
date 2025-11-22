@@ -4,3 +4,7 @@ openpyxl
 matplotlib
 seaborn
 numpy
+vosk 
+pydub 
+soundfile 
+python-multipart
