@@ -1,3 +1,15 @@
+# app/services/stt_service.py
+"""
+Speech-to-text + scoring service (Vosk-based).
+
+- converts any uploaded audio to 16kHz mono WAV
+- runs Vosk ASR
+- computes:
+    - overall similarity between expected sentence and recognized sentence
+    - per-word scores + mistake types
+- records attempt into user_progress via record_attempt()
+"""
+
 import os
 import tempfile
 import json
@@ -8,28 +20,27 @@ from typing import Tuple, List, Dict, Optional
 
 from vosk import Model, KaldiRecognizer
 
-# DB progress recording import
 from app.database.connection import SessionLocal
 from app.services.progress_service import record_attempt
 
-# Resolve VOSK model path (relative to project root if provided that way)
+# ---- VOSK MODEL SETUP ----
 ROOT = pathlib.Path(__file__).resolve().parents[2]  # project root (..\..)
 VOSK_MODEL_REL = os.getenv("VOSK_MODEL_PATH", "softwaremodels/vosk-model-small-en-us-0.15")
 VOSK_MODEL_PATH = str((ROOT / VOSK_MODEL_REL).resolve())
 
 if not Path(VOSK_MODEL_PATH).is_dir():
     raise RuntimeError(
-        f"Vosk model not found at {VOSK_MODEL_PATH}. Please download and extract the model, or set VOSK_MODEL_PATH in .env"
+        f"Vosk model not found at {VOSK_MODEL_PATH}. Please download and extract the model, "
+        "or set VOSK_MODEL_PATH in .env"
     )
 
-# Load model once
 VOSK_MODEL = Model(VOSK_MODEL_PATH)
 
 
 def _to_wav_mono_16k(in_path: str, out_path: str) -> None:
     """
     Convert any audio file to WAV 16k mono PCM using pydub (ffmpeg must be installed).
-    pydub is imported lazily so ffmpeg path can be configured by main app before use.
+    pydub is imported lazily so ffmpeg path can be configured in main app before use.
     """
     try:
         from pydub import AudioSegment
@@ -50,8 +61,7 @@ def _vosk_recognize(wav_path: str) -> Tuple[str, Optional[float]]:
 
     results = []
     with open(wav_path, "rb") as fh:
-        # If file is real WAV, skip header (many examples use 44 bytes); KaldiRecognizer accepts raw PCM as well.
-        # Keep reading in chunks and feed recognizer.
+        # skip WAV header
         fh.read(44)
         while True:
             data = fh.read(4000)
@@ -63,7 +73,6 @@ def _vosk_recognize(wav_path: str) -> Tuple[str, Optional[float]]:
         final = json.loads(rec.FinalResult())
         results.append(final)
 
-    # combine text and confidences
     text_parts: List[str] = []
     confidences: List[float] = []
     for r in results:
@@ -83,7 +92,7 @@ def _vosk_recognize(wav_path: str) -> Tuple[str, Optional[float]]:
 
 def simple_similarity_score(expected: str, spoken: str) -> float:
     """
-    Very simple similarity metric (string-based) returning 0-100 percentage.
+    Simple string similarity (0–100).
     """
     if not spoken:
         return 0.0
@@ -93,8 +102,8 @@ def simple_similarity_score(expected: str, spoken: str) -> float:
 
 def compare_words(expected: str, spoken: str) -> Tuple[float, Optional[str]]:
     """
-    Compare two words and return (score 0-100, mistake_type or None).
-    Mistake types: None, "near_miss", "missing_word", "extra_pronunciation", "mispronounced"
+    Compare two words and return (score 0–100, mistake_type or None).
+    mistake_type ∈ {None, "near_miss", "missing_word", "extra_pronunciation", "mispronounced"}
     """
     expected_clean = expected.lower().strip()
     spoken_clean = spoken.lower().strip()
@@ -120,9 +129,9 @@ def compare_words(expected: str, spoken: str) -> Tuple[float, Optional[str]]:
     return score, mistake
 
 
-def _word_level_analysis(expected_sentence: str, recognized_sentence: str) -> Dict:
+def _word_level_analysis(expected_sentence: str, recognized_sentence: str) -> Dict[str, any]:
     """
-    Produce a per-word breakdown and an averaged word score.
+    Break down expected vs recognized at word level.
     """
     expected_words = [w for w in expected_sentence.replace("?", "").replace("!", "").split() if w]
     recognized_words = [w for w in recognized_sentence.split() if w]
@@ -133,34 +142,48 @@ def _word_level_analysis(expected_sentence: str, recognized_sentence: str) -> Di
         exp = expected_words[i] if i < len(expected_words) else ""
         rec = recognized_words[i] if i < len(recognized_words) else ""
         w_score, mistake = compare_words(exp, rec)
-        word_analysis.append({
-            "expected": exp,
-            "spoken": rec,
-            "word_score": w_score,
-            "mistake": mistake
-        })
+        word_analysis.append(
+            {
+                "expected": exp,
+                "spoken": rec,
+                "word_score": w_score,
+                "mistake": mistake,
+            }
+        )
 
-    avg_word_score = round(sum(w["word_score"] for w in word_analysis) / len(word_analysis), 2) if word_analysis else 0.0
+    avg_word_score = (
+        round(sum(w["word_score"] for w in word_analysis) / len(word_analysis), 2)
+        if word_analysis
+        else 0.0
+    )
 
     return {"avg_word_score": avg_word_score, "word_breakdown": word_analysis}
 
 
-def analyze_audio_file(file_path: str, expected_word: str, user_id: int = None, record: bool = True) -> Dict:
+def analyze_audio_file(
+    file_path: str,
+    expected_word: str,
+    user_id: Optional[int] = None,
+    record: bool = True,
+) -> Dict[str, any]:
     """
-    Main orchestrator:
-      - convert incoming file to WAV 16k mono
-      - run Vosk
-      - compute overall similarity & word-level breakdown
-      - optionally record attempt via record_attempt()
-    Returns a dict with recognized, confidence, scores and word breakdown.
+    Orchestrator used by the speech route.
+
+    Steps:
+    - Convert uploaded file to temp WAV (16k mono)
+    - Run Vosk to get recognized text + confidence
+    - Compute:
+        - overall_similarity_percent (sentence-level)
+        - word_level: avg_word_score + per-word breakdown
+    - Record attempt via record_attempt (if user_id provided)
     """
     tmp_wav = None
     try:
-        # create temp wav file path
+        # create temp wav path
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_wav = tmp.name
 
-        # convert input -> tmp_wav
+        # convert -> wav
         _to_wav_mono_16k(file_path, tmp_wav)
 
         # recognize
@@ -169,7 +192,7 @@ def analyze_audio_file(file_path: str, expected_word: str, user_id: int = None, 
         # overall similarity (string-level)
         overall_similarity = simple_similarity_score(expected_word, recognized)
 
-        # word-level analysis
+        # word-level details
         word_analysis_res = _word_level_analysis(expected_word, recognized)
 
         result = {
@@ -177,22 +200,27 @@ def analyze_audio_file(file_path: str, expected_word: str, user_id: int = None, 
             "recognized": recognized,
             "confidence": confidence,
             "overall_similarity_percent": overall_similarity,
-            "word_level": word_analysis_res
+            "word_level": word_analysis_res,
         }
 
-        # persist attempt for user if requested
+        # persist attempt if user_id is known
         if record and user_id:
             db = SessionLocal()
             try:
-                # frontend should send time_spent if available; default to 0.0
-                record_attempt(db, user_id=user_id, word=expected_word, score=word_analysis_res["avg_word_score"], time_spent=0.0)
+                # using avg word score as the attempt score
+                record_attempt(
+                    db,
+                    user_id=user_id,
+                    word=expected_word,  # record_attempt will map sentence -> word if needed
+                    score=word_analysis_res["avg_word_score"],
+                    time_spent=0.0,  # frontend can send real value later
+                )
             finally:
                 db.close()
 
         return result
 
     finally:
-        # cleanup temp wav
         if tmp_wav and os.path.exists(tmp_wav):
             try:
                 os.remove(tmp_wav)

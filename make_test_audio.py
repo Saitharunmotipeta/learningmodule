@@ -10,7 +10,7 @@ engine.setProperty('rate', 150)  # 120-180 is usually good; lower for clearer en
 voices = engine.getProperty('voices')
 # engine.setProperty('voice', voices[0].id)
 
-text = "helo ho ar yu?"  # choose the test word or a short phrase
+text = "vul"  # choose the test word or a short phrase
 filename = "test.wav"
 engine.save_to_file(text, filename)
 engine.runAndWait()
