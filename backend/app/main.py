@@ -78,6 +78,7 @@ from app.routes.users import router as users_router
 from app.routes.learning import router as learning_router
 from app.routes.progress import router as progress_router
 from app.routes.speech import router as speech_router
+from app.routes.adaptive import router as adaptive_router
 
 # If you later add adaptive-specific routes, import and include here:
 # from app.routes.adaptive import router as adaptive_router
@@ -104,15 +105,10 @@ app.add_middleware(
 # ================================
 # Auth / users
 app.include_router(users_router, prefix="/api", tags=["users"])
-
-# Learning / levels / word analysis
 app.include_router(learning_router, prefix="/api/learning", tags=["learning"])
-
-# Progress + recommendation
 app.include_router(progress_router, prefix="/api/learning", tags=["progress"])
-
-# Speech analysis (STT + scoring)
 app.include_router(speech_router, prefix="/api", tags=["speech"])
+app.include_router(adaptive_router, prefix="/api")
 
 # If you add adaptive router:
 # app.include_router(adaptive_router, prefix="/api/learning", tags=["adaptive"])
