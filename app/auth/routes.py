@@ -9,7 +9,8 @@ from app.auth.models import User
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login/swagger")
+# ✅ SINGLE SOURCE OF TRUTH FOR AUTH
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def get_db():
@@ -33,15 +34,19 @@ def register(data: schemas.RegisterIn, db: Session = Depends(get_db)):
     }
 
 
-# ✅ LOGIN FOR FRONTEND (JSON ✅)
+# ✅ ✅ ✅ SINGLE LOGIN FOR BOTH SWAGGER + FRONTEND
 @router.post("/login")
-def login_json(data: schemas.LoginIn, db: Session = Depends(get_db)):
-    result = service.login_user(db, data.email, data.password)
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),  # ✅ THIS IS THE KEY
+    db: Session = Depends(get_db)
+):
+    # ⚠️ Swagger sends "username" even if it's email
+    result = service.login_user(db, form_data.username, form_data.password)
 
     if not result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
+            detail="Invalid email or password",
         )
 
     token, user = result
@@ -55,29 +60,7 @@ def login_json(data: schemas.LoginIn, db: Session = Depends(get_db)):
     }
 
 
-# ✅ LOGIN FOR SWAGGER AUTHORIZE BUTTON (FORM ✅)
-@router.post("/login/swagger")
-def login_swagger(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    result = service.login_user(db, form_data.username, form_data.password)
-
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
-
-    token, user = result
-
-    return {
-        "access_token": token,
-        "token_type": "bearer"
-    }
-
-
-# ✅ PROFILE (BEARER TOKEN REQUIRED ✅)
+# ✅ PROFILE (JWT PROTECTED)
 @router.get("/profile")
 def get_profile(
     token: str = Depends(oauth2_scheme),

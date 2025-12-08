@@ -53,6 +53,7 @@ class LevelWord(Base):
     user_id = Column(Integer, nullable=False)
     word_id = Column(Integer, ForeignKey("words.id"), nullable=False)
     level_id = Column(Integer, ForeignKey("levels.id"), nullable=False)
+    image_url = Column(String, nullable=True, default=None)
 
     attempts = Column(Integer, default=0)
     correct_attempts = Column(Integer, default=0)

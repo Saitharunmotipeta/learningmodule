@@ -29,6 +29,7 @@ class WordStatusOut(BaseModel):
     text: str
     phonetics: str
     syllables: str
+    image_url: str | None
     difficulty: str
     is_mastered: bool
     mastery_score: float
